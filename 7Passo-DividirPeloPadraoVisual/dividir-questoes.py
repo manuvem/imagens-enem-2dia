@@ -40,47 +40,46 @@ def validar_faixa(
 
 def encontrar_padroes_corte(imagem, tolerancia=20):
     """
-    Varre o penúltimo pixel da direita de cima a baixo buscando a sequência de 3 faixas.
-    Retorna a lista com as alturas (y) de corte.
+    Varre o penúltimo pixel da direita buscando a sequência de 3 faixas.
+    Retorna pares com (fim_da_questao_atual, inicio_da_proxima_questao).
     """
     largura, altura = imagem.size
     pixels = imagem.load()
 
-    # Cores alvo RGB solicitadas
     cor_1 = (255, 252, 191)
     cor_2 = (255, 254, 230)
     cor_3 = (255, 252, 191)
 
-    posicoes_corte = []
+    intervalos_corte = []
 
-    # Penúltimo pixel da direita (largura - 2)
     coluna_x = largura - 2
     if coluna_x < 0:
-        return posicoes_corte
+        return intervalos_corte
 
     y = 0
     while y < altura:
-        # 1ª Faixa: 10px RGB (255, 252, 191)
         h1 = validar_faixa(pixels, coluna_x, y, altura, 10, 10, cor_1, tolerancia)
         if h1 > 0:
-            # 2ª Faixa: 7px RGB (255, 254, 230)
             h2 = validar_faixa(pixels, coluna_x, y + h1, altura, 7, 7, cor_2, tolerancia)
             if h2 > 0:
-                # 3ª Faixa: 4px RGB (255, 252, 191)
                 h3 = validar_faixa(pixels, coluna_x, y + h1 + h2, altura, 4, 4, cor_3, tolerancia)
                 if h3 > 0:
-                    posicao_corte = max(0, y - 10)
-                    posicoes_corte.append(posicao_corte)
+                    h_total = h1 + h2 + h3
+                    # Recorta a questão anterior 10px antes da faixa
+                    fim_questao = max(0, y - 10)
+                    # Inicia a próxima questão 10px depois que a faixa termina
+                    inicio_proxima = min(altura, y + h_total + 10)
 
-                    print(f"Padrão detectado na linha y={y} (coluna {coluna_x}). Ponto de corte em y={posicao_corte}")
+                    intervalos_corte.append((fim_questao, inicio_proxima))
 
-                    # Avança o tamanho exato do padrão encontrado (10 + 7 + 4 = 21px)
-                    y += h1 + h2 + h3
+                    print(f"Divisor encontrado em y={y}. Fim da questão em y={fim_questao}, início da próxima em y={inicio_proxima}")
+
+                    y += h_total
                     continue
 
         y += 1
 
-    return posicoes_corte
+    return intervalos_corte
 
 
 def dividir_imagem_por_faixas(caminho_imagem, pasta_saida):
@@ -93,34 +92,36 @@ def dividir_imagem_por_faixas(caminho_imagem, pasta_saida):
 
     print(f"--- Processando imagem: {largura}x{altura} pixels ---")
 
-    posicoes_corte = encontrar_padroes_corte(imagem)
+    intervalos_corte = encontrar_padroes_corte(imagem)
 
-    if not posicoes_corte:
+    if not intervalos_corte:
         print("Nenhum padrão visual foi encontrado para realizar os cortes.")
         return
 
     os.makedirs(pasta_saida, exist_ok=True)
 
-    posicao_anterior = 0
+    posicao_inicio = 0
     contador = 1
 
-    for posicao_corte in posicoes_corte:
-        if posicao_corte <= posicao_anterior:
-            continue
+    # Recorta individualmente cada questão isolada entre as faixas divisa
+    for fim_questao, inicio_proxima in intervalos_corte:
+        if fim_questao > posicao_inicio:
+            area_corte = (0, posicao_inicio, largura, fim_questao)
+            secao = imagem.crop(area_corte)
 
-        area_corte = (0, posicao_anterior, largura, posicao_corte)
-        secao = imagem.crop(area_corte)
+            nome_arquivo = f"parte_{contador:03d}.png"
+            caminho_completo = os.path.join(pasta_saida, nome_arquivo)
+            secao.save(caminho_completo)
+            print(f"-> Salvo: {nome_arquivo} [{secao.width}x{secao.height}px]")
 
-        nome_arquivo = f"parte_{contador:03d}.png"
-        caminho_completo = os.path.join(pasta_saida, nome_arquivo)
-        secao.save(caminho_completo)
-        print(f"-> Salvo: {nome_arquivo} [{secao.width}x{secao.height}px]")
+            contador += 1
 
-        posicao_anterior = posicao_corte
-        contador += 1
+        # Salta a faixa divisória amarela para iniciar a próxima questão limpa
+        posicao_inicio = inicio_proxima
 
-    if posicao_anterior < altura:
-        area_corte = (0, posicao_anterior, largura, altura)
+    # Salva a última questão (do final do último padrão até a base da imagem)
+    if posicao_inicio < altura:
+        area_corte = (0, posicao_inicio, largura, altura)
         secao = imagem.crop(area_corte)
 
         nome_arquivo = f"parte_{contador:03d}.png"
@@ -135,3 +136,4 @@ if __name__ == "__main__":
 
     dividir_imagem_por_faixas(caminho_imagem, pasta_saida)
     print("\nProcesso de divisão concluído com sucesso!")
+
