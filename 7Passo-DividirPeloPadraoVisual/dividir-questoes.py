@@ -51,7 +51,7 @@ def encontrar_padroes_corte(imagem, tolerancia=20):
     cor_3 = (255, 252, 191)
 
     pontos_corte = []
-    coluna_x = largura - 1
+    coluna_x = largura - 2
 
     if coluna_x < 0:
         return pontos_corte
@@ -141,7 +141,7 @@ def dividir_imagem_por_faixas(caminho_imagem, pasta_saida):
 
 if __name__ == "__main__":
     caminho_imagem = "colunas_concatenadas_verticalmente.png"
-    pasta_saida = "saida_questoes"
+    pasta_saida = "saida_questoes2"
 
     dividir_imagem_por_faixas(caminho_imagem, pasta_saida)
     print("\nProcesso de divisão concluído com sucesso!")
